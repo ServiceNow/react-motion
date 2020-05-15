@@ -1,0 +1,42 @@
+# This workflow will run tests using node and then publish a package to GitHub Packages when a release is created
+# For more information see: https://help.github.com/actions/language-and-framework-guides/publishing-nodejs-packages
+
+name: Publish
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v1
+        with:
+          node-version: 12
+      - run: yarn --frozen-lockfile
+      - run: npm run -s lint
+      - run: npm run -s flow_check
+      - run: npm run -s test:travis
+      - run: npm pack --dry-run
+
+  publish-npm:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: olegtarasov/get-tag@v2
+        id: tagName
+        with:
+          tagRegex: "release/v?(.*)"
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v1
+        with:
+          node-version: 12
+          registry-url: https://registry.npmjs.org/
+      - run: npm version --force --no-git-tag-version --allow-same-version ${GIT_TAG_NAME}
+      - run: yarn --frozen-lockfile
+      - run: npm shrinkwrap
+      - run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{secrets.NOW_BUILD_NPMJS_TOKEN}}
